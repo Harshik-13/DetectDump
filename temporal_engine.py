@@ -10,10 +10,11 @@ Core Logic:
   If the object persists long enough, flag as DUMPING_CANDIDATE.
 """
 
-import time
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Optional
+
+WASTE_CLASSES = {"backpack", "handbag", "suitcase", "bottle", "box"}
 
 
 class State(Enum):
@@ -33,6 +34,7 @@ class Thresholds:
     actor_absence_frames: int = 30          # frames actor must be gone before counting persistence
     association_radius: float = 150.0       # pixels — how close actor must be to object to be "associated"
     min_track_length: int = 10              # minimum frames an object must be tracked before evaluation
+    video_fps: float = 30.0                # video FPS for computing video-relative timestamps
 
 
 @dataclass
@@ -42,6 +44,7 @@ class TrackedObject:
     state: State = State.IDLE
     centroid_history: list = field(default_factory=list)
     last_centroid: Optional[tuple] = None
+    last_bbox: Optional[tuple] = None
     frames_stationary: int = 0
     frames_since_actor: int = 0
     associated_actor_id: Optional[int] = None
@@ -59,12 +62,14 @@ class DumpingEvent:
     stationary_duration_frames: int
     actor_status: str
     centroid: tuple
+    bbox: Optional[tuple] = None
     vlm: object = None  # VerificationResult from vlm_verify.py, set after creation
 
 
 class TemporalEventEngine:
     def __init__(self, thresholds: Optional[Thresholds] = None):
         self.thresholds = thresholds or Thresholds()
+        self.video_fps = self.thresholds.video_fps
         self.objects: dict[int, TrackedObject] = {}
         self.events: list[DumpingEvent] = []
         self.frame_num: int = 0
@@ -94,12 +99,7 @@ class TemporalEventEngine:
 
             if cls == "person":
                 actor_ids.add(tid)
-            # Accept objects that could be waste: backpack, handbag, suitcase, bottle, box-like
-            # Also accept any unknown object that isn't a person or vehicle
-            if cls in ("backpack", "handbag", "suitcase", "bottle", "box"):
-                object_detections.append(det)
-            elif cls not in ("person", "car", "truck", "bus", "motorcycle", "bicycle"):
-                # Treat other non-vehicle, non-person objects as potential waste
+            if cls in WASTE_CLASSES:
                 object_detections.append(det)
 
         self.active_actor_ids = actor_ids
@@ -121,6 +121,7 @@ class TemporalEventEngine:
             obj.total_frames_tracked += 1
             obj.centroid_history.append(centroid)
             obj.last_centroid = centroid
+            obj.last_bbox = det.get("bbox")
 
             # Keep only recent history to bound memory
             if len(obj.centroid_history) > 300:
@@ -213,10 +214,11 @@ class TemporalEventEngine:
                         track_id=obj.track_id,
                         class_name=obj.class_name,
                         frame_num=frame_num,
-                        timestamp=time.time(),
+                        timestamp=frame_num / self.video_fps,
                         stationary_duration_frames=obj.frames_stationary,
                         actor_status="LEFT",
                         centroid=obj.last_centroid,
+                        bbox=obj.last_bbox,
                     )
                     self.events.append(event)
                     return event

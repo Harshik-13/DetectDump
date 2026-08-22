@@ -15,24 +15,6 @@ def run_dumping_detection(video_path: str, output_path: str = "output_dumping.mp
                           thresholds: Thresholds = None):
     """Full pipeline: detection + tracking + temporal event engine."""
 
-    # Use sensible defaults if no thresholds provided
-    if thresholds is None:
-        thresholds = Thresholds(
-            movement_threshold=30.0,
-            persistence_frames=60,     # ~2.5s at 24fps
-            actor_absence_frames=15,   # ~0.6s at 24fps
-            association_radius=200.0,
-            min_track_length=5,
-        )
-    engine = TemporalEventEngine(thresholds)
-    model = YOLO("yolov8n.pt")
-
-    print(f"Model: yolov8n.pt")
-    print(f"Video: {video_path}")
-    print(f"Thresholds: movement={engine.thresholds.movement_threshold}px, "
-          f"persistence={engine.thresholds.persistence_frames}f, "
-          f"actor_absence={engine.thresholds.actor_absence_frames}f")
-
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
         print(f"ERROR: Cannot open video: {video_path}")
@@ -43,6 +25,24 @@ def run_dumping_detection(video_path: str, output_path: str = "output_dumping.mp
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
 
+    # Use sensible defaults if no thresholds provided
+    if thresholds is None:
+        thresholds = Thresholds(
+            movement_threshold=30.0,
+            persistence_frames=60,     # ~2.5s at 24fps
+            actor_absence_frames=15,   # ~0.6s at 24fps
+            association_radius=200.0,
+            min_track_length=5,
+            video_fps=fps,
+        )
+    engine = TemporalEventEngine(thresholds)
+    model = YOLO("yolov8n.pt")
+
+    print(f"Model: yolov8n.pt")
+    print(f"Video: {video_path}")
+    print(f"Thresholds: movement={engine.thresholds.movement_threshold}px, "
+          f"persistence={engine.thresholds.persistence_frames}f, "
+          f"actor_absence={engine.thresholds.actor_absence_frames}f")
     print(f"Resolution: {width}x{height}, Frames: {total_frames}, FPS: {fps}")
     print("=" * 60)
 
@@ -190,6 +190,7 @@ def run_dumping_detection(video_path: str, output_path: str = "output_dumping.mp
                 track_id=event.track_id,
                 class_name=event.class_name,
                 centroid=event.centroid,
+                bbox=event.bbox,
             )
             event.vlm = vlm_result
 

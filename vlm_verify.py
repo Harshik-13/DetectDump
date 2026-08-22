@@ -53,11 +53,37 @@ def encode_frame_to_base64(frame: cv2.Mat, quality: int = 80) -> str:
     return base64.b64encode(buffer).decode("utf-8")
 
 
+def crop_candidate_evidence(frame: cv2.Mat, bbox: tuple) -> cv2.Mat:
+    """Crop frame around candidate bbox with context padding and highlight the candidate."""
+    h, w = frame.shape[:2]
+    x1, y1, x2, y2 = bbox
+    bw, bh = x2 - x1, y2 - y1
+
+    pad_x = max(int(bw * 0.5), 30)
+    pad_y = max(int(bh * 0.5), 30)
+
+    cx1 = max(0, x1 - pad_x)
+    cy1 = max(0, y1 - pad_y)
+    cx2 = min(w, x2 + pad_x)
+    cy2 = min(h, y2 + pad_y)
+
+    crop = frame[cy1:cy2, cx1:cx2].copy()
+
+    rx1, ry1 = x1 - cx1, y1 - cy1
+    rx2, ry2 = x2 - cx1, y2 - cy1
+    cv2.rectangle(crop, (rx1, ry1), (rx2, ry2), (0, 0, 255), 2)
+    cv2.putText(crop, "CANDIDATE", (rx1, ry1 - 6),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)
+
+    return crop
+
+
 def verify_dumping_event(
     frame: cv2.Mat,
     track_id: int,
     class_name: str,
     centroid: tuple,
+    bbox: Optional[tuple] = None,
     confidence: float = 0.0,
     api_key: Optional[str] = None,
     base_url: Optional[str] = None,
@@ -89,8 +115,12 @@ def verify_dumping_event(
             verified=False,
         )
 
-    # Encode frame
-    img_b64 = encode_frame_to_base64(frame)
+    # Encode frame — crop to candidate if bbox available
+    if bbox is not None:
+        evidence_frame = crop_candidate_evidence(frame, bbox)
+    else:
+        evidence_frame = frame
+    img_b64 = encode_frame_to_base64(evidence_frame)
 
     # Build message
     user_content = [

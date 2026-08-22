@@ -68,15 +68,6 @@ def format_frame_time(frame_num, fps):
 
 def run_pipeline(video_path):
     """Run the full CV pipeline and return results."""
-    engine = TemporalEventEngine(Thresholds(
-        movement_threshold=30.0,
-        persistence_frames=60,
-        actor_absence_frames=15,
-        association_radius=200.0,
-        min_track_length=5,
-    ))
-    model = YOLO("yolov8n.pt")
-
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
         return None
@@ -85,6 +76,16 @@ def run_pipeline(video_path):
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     fps = cap.get(cv2.CAP_PROP_FPS) or 24.0
+
+    engine = TemporalEventEngine(Thresholds(
+        movement_threshold=30.0,
+        persistence_frames=60,
+        actor_absence_frames=15,
+        association_radius=200.0,
+        min_track_length=5,
+        video_fps=fps,
+    ))
+    model = YOLO("yolov8n.pt")
 
     output_path = os.path.join(tempfile.gettempdir(), "dumpwatch_output.mp4")
     fourcc = cv2.VideoWriter_fourcc(*"mp4v")
@@ -184,6 +185,7 @@ def run_pipeline(video_path):
             vlm_result = verify_dumping_event(
                 frame=frame, track_id=event.track_id,
                 class_name=event.class_name, centroid=event.centroid,
+                bbox=event.bbox,
             )
             event.vlm = vlm_result
             obj = engine.objects.get(event.track_id)
