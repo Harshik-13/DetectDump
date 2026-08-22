@@ -151,7 +151,7 @@ def run_pipeline(video_path):
 
             if state == State.DUMPING_CANDIDATE:
                 color, thickness = (0, 0, 255), 3
-                label = "DUMPING CANDIDATE"
+                label = "UNATTENDED OBJECT"
             elif state == State.ACTOR_LEFT:
                 color, thickness = (0, 200, 255), 2
                 label = "ACTOR LEFT"
@@ -176,7 +176,7 @@ def run_pipeline(video_path):
             if obj.state == State.DUMPING_CANDIDATE and obj.last_centroid:
                 cx, cy = obj.last_centroid
                 cv2.circle(annotated, (cx, cy), 40, (0, 0, 255), 3)
-                cv2.putText(annotated, "!! DUMPING DETECTED !!", (cx - 80, cy - 50),
+                cv2.putText(annotated, "!! UNATTENDED OBJECT DETECTED !!", (cx - 100, cy - 50),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
 
         writer.write(annotated)
@@ -297,12 +297,22 @@ if uploaded_file and analyze_clicked:
                 timestamp = format_frame_time(event.frame_num, result["fps"])
                 summary_text = vlm.summary if (vlm and vlm.verified) else "VLM verification unavailable"
 
+                if vlm and vlm.verified and vlm.confirmed:
+                    card_title = "ILLEGAL DUMPING DETECTED"
+                    card_color = "#B8492E"
+                elif vlm and vlm.verified and not vlm.confirmed:
+                    card_title = "UNATTENDED OBJECT — NOT CONFIRMED"
+                    card_color = "#97998C"
+                else:
+                    card_title = "UNATTENDED OBJECT CANDIDATE"
+                    card_color = "#D98A2B"
+
                 st.markdown(f"""
-                <div style="border-left:4px solid #B8492E;background:#1C201D;border-radius:10px;
+                <div style="border-left:4px solid {card_color};background:#1C201D;border-radius:10px;
                             padding:1.5rem;margin-bottom:1rem;">
-                    <h2 style="font-family:'Archivo',sans-serif;color:#B8492E;font-size:1.15rem;
+                    <h2 style="font-family:'Archivo',sans-serif;color:{card_color};font-size:1.15rem;
                                font-weight:700;margin-bottom:1.1rem;">
-                        WARNING: ILLEGAL DUMPING DETECTED
+                        {card_title}
                     </h2>
                     <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem;">
                         <div>

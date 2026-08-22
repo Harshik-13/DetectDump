@@ -102,7 +102,7 @@ def run_dumping_detection(video_path: str, output_path: str = "output_dumping.mp
             if state == State.DUMPING_CANDIDATE:
                 color = (0, 0, 255)       # Red - CRITICAL
                 thickness = 3
-                label = f"DUMPING CANDIDATE"
+                label = f"UNATTENDED OBJECT"
             elif state == State.PERSISTING:
                 color = (0, 140, 255)      # Orange
                 thickness = 2
@@ -148,7 +148,7 @@ def run_dumping_detection(video_path: str, output_path: str = "output_dumping.mp
                 cx, cy = obj.last_centroid
                 # Pulsing alert circle
                 cv2.circle(annotated, (cx, cy), 40, (0, 0, 255), 3)
-                cv2.putText(annotated, "!! DUMPING DETECTED !!", (cx - 80, cy - 50),
+                cv2.putText(annotated, "!! UNATTENDED OBJECT DETECTED !!", (cx - 100, cy - 50),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
 
                 # Show VLM status if available
@@ -174,7 +174,7 @@ def run_dumping_detection(video_path: str, output_path: str = "output_dumping.mp
         for event in new_events:
             events_this_run.append(event)
             print(f"\n{'!'*60}")
-            print(f"DUMPING_CANDIDATE")
+            print(f"UNATTENDED_OBJECT_CANDIDATE")
             print(f"  track_id:             {event.track_id}")
             print(f"  class:                {event.class_name}")
             print(f"  frame:                {event.frame_num}")

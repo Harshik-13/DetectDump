@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Optional
 
-WASTE_CLASSES = {"backpack", "handbag", "suitcase", "bottle", "box"}
+VEHICLE_CLASSES = {"car", "truck", "bus", "motorcycle", "bicycle"}
 
 
 class State(Enum):
@@ -99,7 +99,7 @@ class TemporalEventEngine:
 
             if cls == "person":
                 actor_ids.add(tid)
-            if cls in WASTE_CLASSES:
+            elif cls not in VEHICLE_CLASSES:
                 object_detections.append(det)
 
         self.active_actor_ids = actor_ids

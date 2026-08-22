@@ -31,19 +31,34 @@ class VerificationResult:
     verified: bool  # True if VLM responded, False if fallback
 
 
-PROMPT = """Analyze this image from a surveillance camera. Determine if it shows evidence of illegal dumping or littering.
+PROMPT = """You are a surveillance video analyst verifying whether an unattended object is illegal dumping.
 
-Look for:
-- An object (bag, box, bottle, trash) left behind in a public area
-- A person who appears to have left the object and moved away
-- The object sitting stationary without its owner nearby
+A computer vision system has flagged an object as potentially abandoned. Your job is to determine whether this object is consistent with illegal dumping or littering.
 
-Respond with ONLY a JSON object (no markdown, no extra text):
+EVIDENCE: The image shows a candidate object (highlighted with a red bounding box labeled CANDIDATE) in its surrounding context.
+
+DECISION CRITERIA — confirm ILLEGAL DUMPING if the object appears to be:
+- Garbage bags, trash bags, or waste bags left in a public area
+- Discarded household waste or commercial refuse
+- Abandoned cardboard, packaging, or containers
+- Discarded furniture, appliances, or large items
+- Construction debris or materials dumped inappropriately
+- Any object that appears to be discarded waste/trash left behind by a person who departed
+
+REJECT (not dumping) if the object appears to be:
+- Sports equipment (balls, rackets, etc.)
+- Personal belongings temporarily placed (luggage, shopping bags being carried)
+- An object being actively used or handled by a person
+- A normal fixture of the environment (sign, post, bench, planter)
+- An object that is clearly in motion or being transported
+- Anything that does not visually resemble discarded waste
+
+RESPOND WITH ONLY a JSON object (no markdown, no extra text):
 {
     "confirmed": true/false,
     "event_type": "illegal_dumping" | "abandoned_object" | "normal_scene" | "unclear",
     "severity": "LOW" | "MEDIUM" | "HIGH",
-    "summary": "Brief 1-sentence description of what you see"
+    "summary": "Brief 1-sentence description of what you observe"
 }"""
 
 
