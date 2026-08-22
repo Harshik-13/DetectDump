@@ -1,0 +1,171 @@
+"""
+VLM Verification Module
+Sends evidence frames to a vision-capable LLM for dumping event confirmation.
+Uses OpenRouter (OpenAI-compatible API) as the backend.
+"""
+
+import base64
+import json
+import os
+import time
+from dataclasses import dataclass
+from typing import Optional
+
+import cv2
+from dotenv import load_dotenv
+from openai import OpenAI
+
+# Load .env if present
+load_dotenv()
+
+
+@dataclass
+class VerificationResult:
+    confirmed: bool
+    event_type: str
+    severity: str  # LOW, MEDIUM, HIGH
+    summary: str
+    raw_response: str
+    latency_ms: float
+    model: str
+    verified: bool  # True if VLM responded, False if fallback
+
+
+PROMPT = """Analyze this image from a surveillance camera. Determine if it shows evidence of illegal dumping or littering.
+
+Look for:
+- An object (bag, box, bottle, trash) left behind in a public area
+- A person who appears to have left the object and moved away
+- The object sitting stationary without its owner nearby
+
+Respond with ONLY a JSON object (no markdown, no extra text):
+{
+    "confirmed": true/false,
+    "event_type": "illegal_dumping" | "abandoned_object" | "normal_scene" | "unclear",
+    "severity": "LOW" | "MEDIUM" | "HIGH",
+    "summary": "Brief 1-sentence description of what you see"
+}"""
+
+
+def encode_frame_to_base64(frame: cv2.Mat, quality: int = 80) -> str:
+    """Encode an OpenCV frame to base64 JPEG."""
+    _, buffer = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, quality])
+    return base64.b64encode(buffer).decode("utf-8")
+
+
+def verify_dumping_event(
+    frame: cv2.Mat,
+    track_id: int,
+    class_name: str,
+    centroid: tuple,
+    confidence: float = 0.0,
+    api_key: Optional[str] = None,
+    base_url: Optional[str] = None,
+    model: str = "openai/gpt-4o-mini",
+    timeout: int = 15,
+) -> VerificationResult:
+    """
+    Send an evidence frame to a VLM for dumping event verification.
+
+    Returns VerificationResult with confirmed/event_type/severity/summary.
+    On any failure, returns a fallback result with verified=False.
+    """
+    start = time.time()
+
+    # Get API credentials
+    key = api_key or os.environ.get("OPENROUTER_API_KEY") or os.environ.get("OPENAI_API_KEY")
+    url = base_url or os.environ.get("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
+
+    if not key:
+        latency = (time.time() - start) * 1000
+        return VerificationResult(
+            confirmed=False,
+            event_type="unverified",
+            severity="LOW",
+            summary="VLM unavailable: no API key configured",
+            raw_response="",
+            latency_ms=latency,
+            model=model,
+            verified=False,
+        )
+
+    # Encode frame
+    img_b64 = encode_frame_to_base64(frame)
+
+    # Build message
+    user_content = [
+        {
+            "type": "text",
+            "text": PROMPT,
+        },
+        {
+            "type": "image_url",
+            "image_url": {
+                "url": f"data:image/jpeg;base64,{img_b64}",
+                "detail": "low",
+            },
+        },
+    ]
+
+    try:
+        client = OpenAI(api_key=key, base_url=url, timeout=timeout)
+
+        response = client.chat.completions.create(
+            model=model,
+            messages=[
+                {"role": "system", "content": "You are a surveillance video analyst. Respond only with valid JSON."},
+                {"role": "user", "content": user_content},
+            ],
+            max_tokens=200,
+            temperature=0.1,
+        )
+
+        raw = response.choices[0].message.content.strip()
+        latency = (time.time() - start) * 1000
+
+        # Parse JSON — handle markdown code blocks if present
+        cleaned = raw
+        if "```" in cleaned:
+            cleaned = cleaned.split("```")[1]
+            if cleaned.startswith("json"):
+                cleaned = cleaned[4:]
+            cleaned = cleaned.strip()
+
+        data = json.loads(cleaned)
+
+        return VerificationResult(
+            confirmed=bool(data.get("confirmed", False)),
+            event_type=str(data.get("event_type", "unknown")),
+            severity=str(data.get("severity", "LOW")),
+            summary=str(data.get("summary", "No summary")),
+            raw_response=raw,
+            latency_ms=latency,
+            model=model,
+            verified=True,
+        )
+
+    except json.JSONDecodeError as e:
+        latency = (time.time() - start) * 1000
+        return VerificationResult(
+            confirmed=False,
+            event_type="parse_error",
+            severity="LOW",
+            summary=f"VLM returned invalid JSON: {e}",
+            raw_response=raw if "raw" in dir() else "",
+            latency_ms=latency,
+            model=model,
+            verified=False,
+        )
+
+    except Exception as e:
+        latency = (time.time() - start) * 1000
+        return VerificationResult(
+            confirmed=False,
+            event_type="error",
+            severity="LOW",
+            summary=f"VLM request failed: {type(e).__name__}",
+            raw_response="",
+            latency_ms=latency,
+            model=model,
+            verified=False,
+        )

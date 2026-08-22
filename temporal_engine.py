@@ -59,6 +59,7 @@ class DumpingEvent:
     stationary_duration_frames: int
     actor_status: str
     centroid: tuple
+    vlm: object = None  # VerificationResult from vlm_verify.py, set after creation
 
 
 class TemporalEventEngine:

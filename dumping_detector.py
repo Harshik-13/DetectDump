@@ -1,6 +1,6 @@
 """
 Dumping Detection Pipeline
-VIDEO → YOLO + TRACKING → TEMPORAL ENGINE → ANNOTATED OUTPUT + EVENTS
+VIDEO → YOLO + TRACKING → TEMPORAL ENGINE → VLM VERIFICATION → INCIDENT RESULT
 """
 
 import cv2
@@ -8,6 +8,7 @@ import time
 import sys
 from ultralytics import YOLO
 from temporal_engine import TemporalEventEngine, Thresholds, State
+from vlm_verify import verify_dumping_event
 
 
 def run_dumping_detection(video_path: str, output_path: str = "output_dumping.mp4",
@@ -150,6 +151,16 @@ def run_dumping_detection(video_path: str, output_path: str = "output_dumping.mp
                 cv2.putText(annotated, "!! DUMPING DETECTED !!", (cx - 80, cy - 50),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
 
+                # Show VLM status if available
+                if hasattr(obj, "_last_vlm") and obj._last_vlm:
+                    vlm = obj._last_vlm
+                    status = "VLM: CONFIRMED" if vlm.confirmed else "VLM: NOT CONFIRMED"
+                    color = (0, 255, 0) if vlm.confirmed else (0, 165, 255)
+                    cv2.putText(annotated, status, (cx - 80, cy + 55),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
+                    cv2.putText(annotated, f"{vlm.severity} | {vlm.event_type}", (cx - 80, cy + 70),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.4, color, 1)
+
         # Frame info overlay
         elapsed = time.time() - start_time
         current_fps = frame_num / elapsed if elapsed > 0 else 0
@@ -159,7 +170,7 @@ def run_dumping_detection(video_path: str, output_path: str = "output_dumping.mp
 
         writer.write(annotated)
 
-        # Console output for new events
+        # Console output and VLM verification for new events
         for event in new_events:
             events_this_run.append(event)
             print(f"\n{'!'*60}")
@@ -171,6 +182,31 @@ def run_dumping_detection(video_path: str, output_path: str = "output_dumping.mp
             print(f"  stationary_duration:  {event.stationary_duration_frames} frames")
             print(f"  actor_status:         {event.actor_status}")
             print(f"  centroid:             {event.centroid}")
+
+            # VLM verification
+            print(f"  VLM: Verifying...")
+            vlm_result = verify_dumping_event(
+                frame=frame,
+                track_id=event.track_id,
+                class_name=event.class_name,
+                centroid=event.centroid,
+            )
+            event.vlm = vlm_result
+
+            if vlm_result.verified:
+                print(f"  VLM: CONFIRMED={vlm_result.confirmed} | "
+                      f"type={vlm_result.event_type} | "
+                      f"severity={vlm_result.severity}")
+                print(f"  VLM: {vlm_result.summary}")
+                print(f"  VLM: latency={vlm_result.latency_ms:.0f}ms model={vlm_result.model}")
+            else:
+                print(f"  VLM: UNAVAILABLE - {vlm_result.summary}")
+
+            # Store VLM result on tracked object for frame annotation
+            obj = engine.objects.get(event.track_id)
+            if obj:
+                obj._last_vlm = vlm_result
+
             print(f"{'!'*60}")
 
         if frame_num % 30 == 0 or frame_num == 1:
@@ -197,9 +233,15 @@ def run_dumping_detection(video_path: str, output_path: str = "output_dumping.mp
     if events_this_run:
         print(f"\nEVENT SUMMARY:")
         for e in events_this_run:
+            vlm_status = ""
+            if hasattr(e, "vlm") and e.vlm:
+                if e.vlm.verified:
+                    vlm_status = f" | VLM: {'CONFIRMED' if e.vlm.confirmed else 'NOT CONFIRMED'} ({e.vlm.severity})"
+                else:
+                    vlm_status = " | VLM: unavailable"
             print(f"  Track {e.track_id} ({e.class_name}): "
                   f"stationary {e.stationary_duration_frames} frames, "
-                  f"actor {e.actor_status}")
+                  f"actor {e.actor_status}{vlm_status}")
     else:
         print(f"\nNo dumping events detected.")
 
