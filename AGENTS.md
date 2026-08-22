@@ -153,3 +153,58 @@ Demonstrable > Theoretical
 Necessary > "Nice to have"
 Verified > Assumed
 ```
+
+---
+
+## CURRENT PROJECT STATUS
+
+**Repository**: https://github.com/Harshik-13/DetectDump.git
+**Latest tag**: `v2.0-fastapi-ui`
+**Branch**: `main`
+
+### Architecture
+
+```
+Frontend (ui/detectdump.html)
+    ↓ fetch API
+Backend (app_server.py — FastAPI)
+    ↓ threading
+CV Pipeline (YOLOv8n + ByteTrack + Temporal Engine + VLM)
+    ↓
+Results → JSON → Frontend renders
+```
+
+### Entry Points
+
+| Command | Purpose |
+|---------|---------|
+| `python app_server.py` | Start full application (FastAPI + UI) → http://127.0.0.1:8080 |
+| `python dumping_detector.py <video>` | CLI pipeline (standalone) |
+| `streamlit run app.py` | Legacy Streamlit UI |
+
+### Key Files
+
+| File | Role |
+|------|------|
+| `app_server.py` | FastAPI backend — serves UI + REST API for analysis |
+| `ui/detectdump.html` | Production UI — 4-stage flow connected to backend |
+| `dumping_detector.py` | Standalone CLI pipeline |
+| `temporal_engine.py` | Core state machine (IDLE→OBSERVING→SUSPICIOUS→ACTOR_LEFT→DUMPING_CANDIDATE) |
+| `vlm_verify.py` | VLM verification via OpenRouter (GPT-4o-mini) |
+| `app.py` | Legacy Streamlit UI (preserved, not primary) |
+
+### Test Infrastructure
+
+- `test_temporal_engine.py` — 9 unit/integration tests (all passing)
+- `test_videos/` — validation videos (normal, sports ball, different environment)
+- CPU-only: Intel Core Ultra 5 125H, PyTorch 2.13.0+cpu, ~7-9 FPS
+
+### Git Tags
+
+| Tag | Description |
+|-----|-------------|
+| `v0.2-phase4-vlm` | VLM verification added |
+| `v0.3-phase5-ui` | Streamlit demo UI |
+| `v1.0-code-freeze` | Critical fix pass |
+| `v1.1-generalized` | Generalized detection (behavioral, not waste-class-specific) |
+| `v2.0-fastapi-ui` | FastAPI backend + reference UI frontend |

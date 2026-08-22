@@ -5,7 +5,7 @@ Illegal Dumping Event Detector — CV pipeline that detects when an actor abando
 ## How It Works
 
 ```
-CCTV/Video → YOLO Detection → ByteTrack Tracking → Temporal Event Engine → DUMPING_CANDIDATE → VLM Verification → Evidence Replay
+CCTV/Video → YOLO Detection → ByteTrack Tracking → Temporal Event Engine → DUMPING_CANDIDATE → VLM Verification → Evidence
 ```
 
 1. **YOLOv8n** detects persons, bags, bottles, and other objects per frame
@@ -14,19 +14,20 @@ CCTV/Video → YOLO Detection → ByteTrack Tracking → Temporal Event Engine �
    - `IDLE → OBSERVING → SUSPICIOUS → ACTOR_LEFT → DUMPING_CANDIDATE`
 4. When an object remains stationary after its associated actor leaves, a dumping event is triggered
 5. **VLM (GPT-4o-mini via OpenRouter)** verifies each candidate event against the visual scene
-6. **Streamlit UI** displays annotated video, incident cards, evidence keyframes, and verification results
+6. **FastAPI backend + reference UI** serves the 4-stage flow: Upload → Analyze → Review → Evidence
 
 ## Quick Start
 
 ```bash
-pip install opencv-python ultralytics streamlit
+pip install opencv-python ultralytics fastapi uvicorn python-dotenv openai
 # Set your OpenRouter API key
 export OPENROUTER_API_KEY="your-key-here"
-# Run the demo
-streamlit run app.py
+# Run the server
+python app_server.py
+# Open http://127.0.0.1:8080
 ```
 
-Or run the pipeline directly:
+Or run the pipeline directly from CLI:
 
 ```bash
 python dumping_detector.py <video_path> <output_path>
@@ -35,33 +36,51 @@ python dumping_detector.py <video_path> <output_path>
 ## Project Structure
 
 ```
-├── app.py                        # Streamlit demo UI
+├── app_server.py                 # FastAPI backend (API + serves UI)
+├── app.py                        # Streamlit demo UI (legacy)
 ├── dumping_detector.py           # Full pipeline: YOLO + tracking + temporal engine + VLM
 ├── temporal_engine.py            # State machine for dumping event detection
 ├── vlm_verify.py                 # VLM verification via OpenRouter (GPT-4o-mini)
-├── pipeline_test.py              # CV foundation test (detection + tracking only)
 ├── test_temporal_engine.py       # Unit tests for temporal engine
 ├── bytetrack_ultralow.yaml       # ByteTrack config for low-confidence objects
+├── ui/
+│   ├── detectdump.html           # Production UI (connected to FastAPI backend)
+│   └── dumpdetect-clean-v3.html  # Visual design source of truth
 ├── test_videos/                  # Test video inputs
 ├── .env                          # API keys (not committed)
+├── .gitignore                    # Git ignore rules
 ├── AGENTS.md                     # Hackathon operating constitution
-└── ui/                           # HTML reference design
+└── README.md                     # This file
 ```
 
 ## Demo
 
 ```bash
-streamlit run app.py
-# Open http://localhost:8501
-# Upload a video → Click "Analyze Video" → View results
+python app_server.py
+# Open http://127.0.0.1:8080
+# Upload a video → Click "Run analysis" → View results → View evidence
 ```
 
 The demo shows:
+- **4-stage flow**: Upload → Analyzing (real progress) → Review detection → Associated evidence
 - **Annotated video** with bounding boxes, track IDs, and state labels
-- **Incident cards** with detected object, actor status, stationary duration, severity, and timestamp
-- **VLM verification** summary and confirmation badge
-- **Associated evidence** keyframes with detection overlays
-- **Technical logs** with pipeline event trace
+- **Detection review** with detected object, actor status, stationary duration, VLM verification, severity, and timestamp
+- **Evidence grid** with keyframe images from the actual analysis
+- **Technical logs** with real pipeline info (video dimensions, FPS, frame count, event details)
+- **New scan** resets everything without browser refresh
+
+## API Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/` | Serve the DetectDump UI |
+| `POST` | `/api/upload` | Upload a video file |
+| `POST` | `/api/analyze` | Start real CV analysis |
+| `GET` | `/api/progress/{id}` | Poll analysis progress |
+| `GET` | `/api/results/{id}` | Get full results |
+| `GET` | `/api/evidence/{id}/{track}/{idx}` | Serve evidence frame |
+| `GET` | `/api/video/{id}` | Serve annotated video |
+| `DELETE` | `/api/cleanup/{id}` | Clean up temp files |
 
 ## Temporal Engine States
 
@@ -93,5 +112,5 @@ Thresholds(
 - **OpenCV** — video I/O and annotation
 - **PyTorch** (CPU) — inference backend
 - **OpenRouter / GPT-4o-mini** — VLM verification
-- **Streamlit** — demo UI
+- **FastAPI + Uvicorn** — backend server
 - **FFmpeg** — H.264 video re-encoding for browser playback
