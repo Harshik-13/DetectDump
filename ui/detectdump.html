@@ -893,7 +893,7 @@ body{
     const eIdx = e0.frame_num || 0;
     const totFrames = videoInfo ? videoInfo.total_frames : 0;
     const fps = videoInfo ? videoInfo.fps : 30;
-    const ts = e0.timestamp ? e0.timestamp.toFixed(1) : '—';
+    const ts = e0.timestamp != null ? e0.timestamp.toFixed(1) : '—';
     const vlm = e0.vlm;
 
     mainAlertText.innerHTML = 'Warning: dumping detected<small>Flagged at frame ' + eIdx + ' of ' + totFrames + '</small>';

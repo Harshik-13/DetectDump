@@ -337,8 +337,8 @@ def _run_pipeline(analysis_id: str, video_path: str):
                 "stationary_duration_frames": e.stationary_duration_frames,
                 "stationary_duration_sec": round(e.stationary_duration_frames / fps, 1) if fps else 0,
                 "actor_status": e.actor_status,
-                "centroid": list(e.centroid) if e.centroid else None,
-                "bbox": list(e.bbox) if e.bbox else None,
+                "centroid": [int(x) for x in e.centroid] if e.centroid else None,
+                "bbox": [int(x) for x in e.bbox] if e.bbox else None,
             }
             if hasattr(e, "vlm") and e.vlm:
                 vlm = e.vlm
