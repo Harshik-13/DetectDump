@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DetectDump - Hackathon Demo</title>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-hover: #1d4ed8;
+            --bg-dark: #0f172a;
+            --card-bg: #1e293b;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --danger: #ef4444;
+            --danger-bg: rgba(239, 68, 68, 0.1);
+            --warning: #f59e0b;
+            --success: #10b981;
+            --border: #334155;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            padding: 2rem;
+            line-height: 1.5;
+        }
+
+        header {
+            margin-bottom: 2rem;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 1rem;
+        }
+
+        h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+        }
+
+        p.subtitle {
+            color: var(--text-muted);
+            font-size: 1.1rem;
+        }
+
+        .container {
+            display: grid;
+            grid-template-columns: 3fr 2fr;
+            gap: 1.5rem;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1.5rem;
+        }
+
+        /* --- INPUT CONTROLS --- */
+        .controls {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+
+        input[type="file"] {
+            background: var(--bg-dark);
+            border: 1px dashed var(--border);
+            padding: 0.75rem;
+            border-radius: 6px;
+            color: var(--text-muted);
+            flex-grow: 1;
+            cursor: pointer;
+        }
+
+        button {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            font-size: 1rem;
+            font-weight: 600;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        button:hover { background: var(--primary-hover); }
+        button:disabled { background: var(--border); cursor: not-allowed; }
+
+        /* --- PROGRESS BAR --- */
+        .progress-container {
+            display: none;
+            margin-bottom: 1.5rem;
+        }
+        
+        .progress-track {
+            background: var(--bg-dark);
+            border-radius: 99px;
+            height: 8px;
+            overflow: hidden;
+            margin-bottom: 0.5rem;
+        }
+
+        .progress-fill {
+            background: var(--primary);
+            height: 100%;
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+
+        .progress-text {
+            font-size: 0.875rem;
+            color: var(--text-muted);
+            text-align: right;
+        }
+
+        /* --- VIDEO PLAYER MOCK --- */
+        .video-wrapper {
+            background: #000;
+            aspect-ratio: 16/9;
+            border-radius: 6px;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid var(--border);
+            overflow: hidden;
+        }
+
+        .video-placeholder-text {
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        .bounding-box {
+            display: none;
+            position: absolute;
+            border: 3px solid var(--danger);
+            top: 40%;
+            left: 35%;
+            width: 15%;
+            height: 25%;
+            background: rgba(239, 68, 68, 0.15);
+        }
+
+        .bounding-box::after {
+            content: "Backpack 0.89";
+            position: absolute;
+            top: -24px;
+            left: -3px;
+            background: var(--danger);
+            color: white;
+            font-size: 0.75rem;
+            padding: 2px 6px;
+            font-weight: bold;
+        }
+
+        /* --- RESULTS PANEL --- */
+        .results-panel {
+            display: none;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .incident-card {
+            border-color: var(--danger);
+            background: var(--danger-bg);
+        }
+
+        .incident-card h2 {
+            color: var(--danger);
+            font-size: 1.25rem;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .data-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .data-item {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .data-label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .data-value {
+            font-weight: 600;
+            font-size: 1rem;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 700;
+        }
+
+        .badge.confirmed { background: var(--success); color: #fff; }
+        .badge.medium { background: var(--warning); color: #fff; }
+
+        .summary-box {
+            background: var(--bg-dark);
+            padding: 1rem;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            border-left: 4px solid var(--danger);
+        }
+
+        /* --- EVIDENCE PANEL --- */
+        .evidence-frame {
+            background: #000;
+            aspect-ratio: 16/9;
+            border-radius: 6px;
+            margin-top: 0.75rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid var(--border);
+            position: relative;
+        }
+
+        .evidence-frame::after {
+            content: "EVIDENCE FRAME: 00:04:12";
+            position: absolute;
+            bottom: 8px;
+            right: 8px;
+            background: rgba(0,0,0,0.7);
+            padding: 4px 8px;
+            font-size: 0.7rem;
+            border-radius: 4px;
+            font-family: monospace;
+        }
+
+        /* --- TECHNICAL DETAILS --- */
+        details {
+            margin-top: 1rem;
+            font-size: 0.85rem;
+        }
+        
+        summary {
+            cursor: pointer;
+            color: var(--text-muted);
+            user-select: none;
+        }
+        
+        pre {
+            background: var(--bg-dark);
+            padding: 1rem;
+            border-radius: 6px;
+            margin-top: 0.5rem;
+            overflow-x: auto;
+            color: #a78bfa;
+            font-family: monospace;
+        }
+
+        /* Utility */
+        .fade-in { animation: fadeIn 0.5s ease-in forwards; }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>DetectDump</h1>
+        <p class="subtitle">Automated Illegal Dumping Detection</p>
+    </header>
+
+    <div class="container">
+        
+        <!-- LEFT COLUMN: Input & Video -->
+        <div class="main-column">
+            <div class="card">
+                <div class="controls">
+                    <input type="file" id="video-upload" accept="video/mp4,video/x-m4v,video/*">
+                    <button id="analyze-btn">Analyze Video</button>
+                </div>
+
+                <div class="progress-container" id="progress-container">
+                    <div class="progress-track">
+                        <div class="progress-fill" id="progress-fill"></div>
+                    </div>
+                    <p class="progress-text" id="progress-text">Initializing pipeline...</p>
+                </div>
+
+                <div class="video-wrapper" id="video-player">
+                    <span class="video-placeholder-text" id="video-status">Awaiting video input...</span>
+                    <div class="bounding-box" id="bounding-box"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- RIGHT COLUMN: Results & Evidence -->
+        <div class="results-panel" id="results-panel">
+            
+            <!-- INCIDENT PANEL -->
+            <div class="card incident-card fade-in">
+                <h2>⚠️ ILLEGAL DUMPING DETECTED</h2>
+                
+                <div class="data-grid">
+                    <div class="data-item">
+                        <span class="data-label">Detected Object</span>
+                        <span class="data-value">Backpack</span>
+                    </div>
+                    <div class="data-item">
+                        <span class="data-label">Actor Status</span>
+                        <span class="data-value">LEFT SCENE</span>
+                    </div>
+                    <div class="data-item">
+                        <span class="data-label">Stationary Duration</span>
+                        <span class="data-value">2.5s</span>
+                    </div>
+                    <div class="data-item">
+                        <span class="data-label">VLM Verification</span>
+                        <span class="data-value"><span class="badge confirmed">CONFIRMED</span></span>
+                    </div>
+                    <div class="data-item">
+                        <span class="data-label">Severity</span>
+                        <span class="data-value"><span class="badge medium">MEDIUM</span></span>
+                    </div>
+                    <div class="data-item">
+                        <span class="data-label">Timestamp</span>
+                        <span class="data-value">00:04:12</span>
+                    </div>
+                </div>
+
+                <div class="summary-box">
+                    <strong>Summary:</strong> An individual walked into the frame, placed a backpack near the structural wall, and exited the scene without retrieving the object.
+                </div>
+            </div>
+
+            <!-- EVIDENCE PANEL -->
+            <div class="card fade-in" style="animation-delay: 0.2s;">
+                <h3 style="margin-bottom: 0.5rem; font-size: 1.1rem;">Associated Evidence</h3>
+                <p style="font-size: 0.85rem; color: var(--text-muted);">Keyframe triggering VLM verification confirmation.</p>
+                
+                <div class="evidence-frame">
+                    <!-- Placeholder for the evidence image extraction -->
+                    <span style="color: var(--text-muted); font-size: 0.9rem;">[ Annotated Image Frame ]</span>
+                </div>
+
+                <details>
+                    <summary>View Technical Logs</summary>
+                    <pre>
+[INFO] YOLOv8 Object detected: id=42, class="backpack", conf=0.89
+[INFO] ByteTrack: Actor ID 11 separated from Object ID 42
+[INFO] TemporalLogic: Object stationary for 2.5s
+[INFO] DUMPING_CANDIDATE generated.
+[VLM-REQ] Prompting VLM with candidate clip...
+[VLM-RES] "True. The person abandons the object." -> CONFIRMED
+                    </pre>
+                </details>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        const analyzeBtn = document.getElementById('analyze-btn');
+        const fileUpload = document.getElementById('video-upload');
+        const progressContainer = document.getElementById('progress-container');
+        const progressFill = document.getElementById('progress-fill');
+        const progressText = document.getElementById('progress-text');
+        const resultsPanel = document.getElementById('results-panel');
+        const videoStatus = document.getElementById('video-status');
+        const boundingBox = document.getElementById('bounding-box');
+
+        analyzeBtn.addEventListener('click', () => {
+            if (!fileUpload.files.length) {
+                alert("Please select a video file first for the demo.");
+                return;
+            }
+
+            // Reset UI for demo
+            analyzeBtn.disabled = true;
+            resultsPanel.style.display = 'none';
+            boundingBox.style.display = 'none';
+            progressContainer.style.display = 'block';
+            videoStatus.innerText = "Processing frames...";
+            
+            let progress = 0;
+            
+            // Mock processing stages to simulate pipeline speed
+            const stages = [
+                { p: 15, text: "Running YOLO detection..." },
+                { p: 35, text: "Applying ByteTrack heuristics..." },
+                { p: 60, text: "Analyzing temporal logic..." },
+                { p: 85, text: "VLM verifying dumping candidate..." },
+                { p: 100, text: "Analysis Complete." }
+            ];
+
+            let stageIndex = 0;
+
+            const interval = setInterval(() => {
+                progress += Math.floor(Math.random() * 5) + 2;
+                if (progress > stages[stageIndex].p) {
+                    progress = stages[stageIndex].p;
+                    progressText.innerText = stages[stageIndex].text;
+                    stageIndex++;
+                }
+
+                progressFill.style.width = `${progress}%`;
+
+                if (progress >= 100) {
+                    clearInterval(interval);
+                    setTimeout(showResults, 500); // slight delay after 100%
+                }
+            }, 100);
+        });
+
+        function showResults() {
+            progressContainer.style.display = 'none';
+            analyzeBtn.disabled = false;
+            
+            // Show Annotated Video elements
+            videoStatus.innerText = "[ Annotated Video Playback ]";
+            videoStatus.style.color = "var(--danger)";
+            boundingBox.style.display = 'block'; // Shows the fake bounding box over the video
+
+            // Reveal Results Panel
+            resultsPanel.style.display = 'flex';
+        }
+    </script>
+</body>
+</html>

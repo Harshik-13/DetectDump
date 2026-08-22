@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DetectDump - Hackathon Demo</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&family=Source+Sans+3:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            /* Graphite base with a faint moss undertone, not navy, not cream */
+            --ink: #15171A;
+            --card-bg: #1C201D;
+            --card-bg-alt: #21251F;
+            --border: #343A2F;
+            --text-main: #EFEEE6;
+            --text-muted: #97998C;
+
+            /* Moss green — grounded in environmental-enforcement branding, not a stock SaaS blue */
+            --brand: #6E9C7B;
+            --brand-deep: #3F5F49;
+            --brand-text-on: #10190F;
+
+            /* Caution / danger drawn from municipal hazard signage, not stock UI red */
+            --amber: #D98A2B;
+            --amber-text-on: #1C1400;
+            --rust: #B8492E;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--ink);
+            color: var(--text-main);
+            font-family: 'Source Sans 3', -apple-system, BlinkMacSystemFont, sans-serif;
+            line-height: 1.5;
+            padding: 2rem;
+        }
+
+        header {
+            max-width: 1400px;
+            margin: 0 auto 2rem;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 1.25rem;
+        }
+
+        h1 {
+            font-family: 'Archivo', sans-serif;
+            font-size: 2rem;
+            font-weight: 800;
+            letter-spacing: -0.3px;
+        }
+
+        p.subtitle {
+            color: var(--text-muted);
+            font-size: 1.05rem;
+            margin-top: 0.25rem;
+        }
+
+        .container {
+            display: grid;
+            grid-template-columns: 3fr 2fr;
+            gap: 1.5rem;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        @media (max-width: 860px) {
+            .container { grid-template-columns: 1fr; }
+        }
+
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 1.5rem;
+        }
+
+        /* --- INPUT CONTROLS --- */
+        .controls {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            flex-wrap: wrap;
+        }
+
+        input[type="file"] {
+            background: var(--ink);
+            border: 1px dashed var(--border);
+            padding: 0.75rem;
+            border-radius: 8px;
+            color: var(--text-muted);
+            flex-grow: 1;
+            min-width: 200px;
+            cursor: pointer;
+            font: inherit;
+        }
+
+        input[type="file"]:focus-visible,
+        button:focus-visible,
+        summary:focus-visible {
+            outline: 2px solid var(--brand);
+            outline-offset: 2px;
+        }
+
+        button {
+            background: var(--brand);
+            color: var(--brand-text-on);
+            border: none;
+            padding: 0.75rem 1.5rem;
+            font-family: 'Archivo', sans-serif;
+            font-size: 0.95rem;
+            font-weight: 700;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background 0.2s ease;
+        }
+
+        button:hover { background: #7FAE8B; }
+        button:disabled { background: var(--border); color: var(--text-muted); cursor: not-allowed; }
+
+        /* --- PROGRESS --- */
+        .progress-container {
+            display: none;
+            margin-bottom: 1.5rem;
+        }
+
+        .progress-track {
+            background: var(--ink);
+            border-radius: 99px;
+            height: 8px;
+            overflow: hidden;
+            margin-bottom: 0.5rem;
+            border: 1px solid var(--border);
+        }
+
+        .progress-fill {
+            background: var(--brand);
+            height: 100%;
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+
+        .progress-text {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            text-align: right;
+        }
+
+        /* --- VIDEO --- */
+        .video-wrapper {
+            background: #000;
+            aspect-ratio: 16/9;
+            border-radius: 8px;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid var(--border);
+            overflow: hidden;
+        }
+
+        .video-placeholder-text {
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        .bounding-box {
+            display: none;
+            position: absolute;
+            border: 3px solid var(--rust);
+            top: 40%;
+            left: 35%;
+            width: 15%;
+            height: 25%;
+            background: rgba(184, 73, 46, 0.15);
+        }
+
+        .bounding-box::after {
+            content: "Backpack 0.89";
+            position: absolute;
+            top: -24px;
+            left: -3px;
+            background: var(--rust);
+            color: #fff;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.72rem;
+            padding: 2px 6px;
+            font-weight: 600;
+        }
+
+        /* --- RESULTS --- */
+        .results-panel {
+            display: none;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .incident-card {
+            border-color: var(--rust);
+            border-left: 4px solid var(--rust);
+        }
+
+        .incident-card h2 {
+            font-family: 'Archivo', sans-serif;
+            color: var(--rust);
+            font-size: 1.15rem;
+            font-weight: 700;
+            margin-bottom: 1.1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .data-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .data-item {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .data-label {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+        }
+
+        .data-value {
+            font-weight: 600;
+            font-size: 1rem;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 0.2rem 0.55rem;
+            border-radius: 5px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.72rem;
+            font-weight: 600;
+            letter-spacing: 0.03em;
+        }
+
+        .badge.confirmed { background: var(--brand); color: var(--brand-text-on); }
+        .badge.medium { background: var(--amber); color: var(--amber-text-on); }
+
+        .summary-box {
+            background: var(--ink);
+            padding: 1rem;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            border-left: 3px solid var(--rust);
+        }
+
+        /* --- EVIDENCE --- */
+        .evidence-frame {
+            background: #000;
+            aspect-ratio: 16/9;
+            border-radius: 8px;
+            margin-top: 0.75rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid var(--border);
+            position: relative;
+        }
+
+        .evidence-frame::after {
+            content: "EVIDENCE FRAME: 00:04:12";
+            position: absolute;
+            bottom: 8px;
+            right: 8px;
+            background: rgba(0,0,0,0.75);
+            padding: 4px 8px;
+            font-size: 0.68rem;
+            border-radius: 4px;
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--text-main);
+        }
+
+        /* --- TECHNICAL DETAILS --- */
+        details {
+            margin-top: 1rem;
+            font-size: 0.85rem;
+        }
+
+        summary {
+            cursor: pointer;
+            color: var(--text-muted);
+            user-select: none;
+        }
+
+        pre {
+            background: var(--ink);
+            padding: 1rem;
+            border-radius: 8px;
+            margin-top: 0.5rem;
+            overflow-x: auto;
+            color: var(--brand);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
+            border: 1px solid var(--border);
+        }
+
+        .fade-in { animation: fadeIn 0.5s ease-in forwards; }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            * { animation: none !important; transition: none !important; }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>DetectDump</h1>
+        <p class="subtitle">Automated Illegal Dumping Detection</p>
+    </header>
+
+    <div class="container">
+
+        <!-- LEFT COLUMN: Input & Video -->
+        <div class="main-column">
+            <div class="card">
+                <div class="controls">
+                    <input type="file" id="video-upload" accept="video/mp4,video/x-m4v,video/*" aria-label="Select a video file">
+                    <button id="analyze-btn">Analyze Video</button>
+                </div>
+
+                <div class="progress-container" id="progress-container">
+                    <div class="progress-track">
+                        <div class="progress-fill" id="progress-fill"></div>
+                    </div>
+                    <p class="progress-text" id="progress-text" aria-live="polite">Initializing pipeline...</p>
+                </div>
+
+                <div class="video-wrapper" id="video-player">
+                    <span class="video-placeholder-text" id="video-status" aria-live="polite">Awaiting video input...</span>
+                    <div class="bounding-box" id="bounding-box"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- RIGHT COLUMN: Results & Evidence -->
+        <div class="results-panel" id="results-panel">
+
+            <!-- INCIDENT PANEL -->
+            <div class="card incident-card fade-in">
+                <h2>⚠ ILLEGAL DUMPING DETECTED</h2>
+
+                <div class="data-grid">
+                    <div class="data-item">
+                        <span class="data-label">Detected Object</span>
+                        <span class="data-value">Backpack</span>
+                    </div>
+                    <div class="data-item">
+                        <span class="data-label">Actor Status</span>
+                        <span class="data-value">LEFT SCENE</span>
+                    </div>
+                    <div class="data-item">
+                        <span class="data-label">Stationary Duration</span>
+                        <span class="data-value">2.5s</span>
+                    </div>
+                    <div class="data-item">
+                        <span class="data-label">VLM Verification</span>
+                        <span class="data-value"><span class="badge confirmed">CONFIRMED</span></span>
+                    </div>
+                    <div class="data-item">
+                        <span class="data-label">Severity</span>
+                        <span class="data-value"><span class="badge medium">MEDIUM</span></span>
+                    </div>
+                    <div class="data-item">
+                        <span class="data-label">Timestamp</span>
+                        <span class="data-value">00:04:12</span>
+                    </div>
+                </div>
+
+                <div class="summary-box">
+                    <strong>Summary:</strong> An individual walked into the frame, placed a backpack near the structural wall, and exited the scene without retrieving the object.
+                </div>
+            </div>
+
+            <!-- EVIDENCE PANEL -->
+            <div class="card fade-in" style="animation-delay: 0.15s;">
+                <h3 style="font-family:'Archivo',sans-serif; margin-bottom: 0.5rem; font-size: 1.05rem;">Associated Evidence</h3>
+                <p style="font-size: 0.85rem; color: var(--text-muted);">Keyframe triggering VLM verification confirmation.</p>
+
+                <div class="evidence-frame">
+                    <span style="color: var(--text-muted); font-size: 0.9rem;">[ Annotated Image Frame ]</span>
+                </div>
+
+                <details>
+                    <summary>View Technical Logs</summary>
+                    <pre>
+[INFO] YOLOv8 Object detected: id=42, class="backpack", conf=0.89
+[INFO] ByteTrack: Actor ID 11 separated from Object ID 42
+[INFO] TemporalLogic: Object stationary for 2.5s
+[INFO] DUMPING_CANDIDATE generated.
+[VLM-REQ] Prompting VLM with candidate clip...
+[VLM-RES] "True. The person abandons the object." -&gt; CONFIRMED
+                    </pre>
+                </details>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        const analyzeBtn = document.getElementById('analyze-btn');
+        const fileUpload = document.getElementById('video-upload');
+        const progressContainer = document.getElementById('progress-container');
+        const progressFill = document.getElementById('progress-fill');
+        const progressText = document.getElementById('progress-text');
+        const resultsPanel = document.getElementById('results-panel');
+        const videoStatus = document.getElementById('video-status');
+        const boundingBox = document.getElementById('bounding-box');
+
+        analyzeBtn.addEventListener('click', () => {
+            if (!fileUpload.files.length) {
+                alert("Please select a video file first for the demo.");
+                return;
+            }
+
+            analyzeBtn.disabled = true;
+            resultsPanel.style.display = 'none';
+            boundingBox.style.display = 'none';
+            progressContainer.style.display = 'block';
+            videoStatus.innerText = "Processing frames...";
+
+            let progress = 0;
+
+            const stages = [
+                { p: 15, text: "Running YOLO detection..." },
+                { p: 35, text: "Applying ByteTrack heuristics..." },
+                { p: 60, text: "Analyzing temporal logic..." },
+                { p: 85, text: "VLM verifying dumping candidate..." },
+                { p: 100, text: "Analysis Complete." }
+            ];
+
+            let stageIndex = 0;
+
+            const interval = setInterval(() => {
+                progress += Math.floor(Math.random() * 5) + 2;
+                if (progress > stages[stageIndex].p) {
+                    progress = stages[stageIndex].p;
+                    progressText.innerText = stages[stageIndex].text;
+                    stageIndex++;
+                }
+
+                progressFill.style.width = `${progress}%`;
+
+                if (progress >= 100) {
+                    clearInterval(interval);
+                    setTimeout(showResults, 500);
+                }
+            }, 100);
+        });
+
+        function showResults() {
+            progressContainer.style.display = 'none';
+            analyzeBtn.disabled = false;
+
+            videoStatus.innerText = "[ Annotated Video Playback ]";
+            videoStatus.style.color = "var(--rust)";
+            boundingBox.style.display = 'block';
+
+            resultsPanel.style.display = 'flex';
+        }
+    </script>
+</body>
+</html>

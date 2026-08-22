@@ -1,5 +1,5 @@
 """
-DumpWatch AI - Streamlit Demo UI
+DetectDump - Streamlit Demo UI
 """
 import streamlit as st
 import cv2
@@ -13,7 +13,7 @@ from temporal_engine import TemporalEventEngine, Thresholds, State
 from vlm_verify import verify_dumping_event
 
 st.set_page_config(
-    page_title="DumpWatch AI",
+    page_title="DetectDump",
     page_icon=None,
     layout="wide",
     initial_sidebar_state="collapsed",
@@ -52,7 +52,7 @@ st.markdown(CSS, unsafe_allow_html=True)
 # --- Header ---
 st.markdown("""
 <div style="border-bottom:1px solid #343A2F;padding-bottom:1.25rem;margin-bottom:1.5rem;">
-    <h1 style="font-family:'Archivo',sans-serif;font-size:2rem;font-weight:800;color:#EFEEE6;margin:0;">DumpWatch AI</h1>
+    <h1 style="font-family:'Archivo',sans-serif;font-size:2rem;font-weight:800;color:#EFEEE6;margin:0;">DetectDump</h1>
     <p style="color:#97998C;font-size:1.05rem;margin-top:0.25rem;">Automated Illegal Dumping Detection</p>
 </div>
 """, unsafe_allow_html=True)
@@ -87,7 +87,7 @@ def run_pipeline(video_path):
     ))
     model = YOLO("yolov8n.pt")
 
-    output_path = os.path.join(tempfile.gettempdir(), "dumpwatch_output.mp4")
+    output_path = os.path.join(tempfile.gettempdir(), "detectdump_output.mp4")
     fourcc = cv2.VideoWriter_fourcc(*"mp4v")
     writer = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
 
