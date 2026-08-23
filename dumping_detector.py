@@ -14,6 +14,8 @@ from temporal_engine import TemporalEventEngine, Thresholds, State
 from action_candidate_detector import ActionCandidateDetector, CandidateConfig
 from vlm_verify import verify_dumping_event
 
+IRRELEVANT_CLASSES = {"airplane", "train", "kite"}
+
 
 def run_dumping_detection(video_path: str, output_path: str = "output_dumping.mp4",
                           thresholds: Thresholds = None):
@@ -82,6 +84,8 @@ def run_dumping_detection(video_path: str, output_path: str = "output_dumping.mp
                 cls = int(r.boxes.cls[i])
                 conf = float(r.boxes.conf[i])
                 name = r.names[cls]
+                if name in IRRELEVANT_CLASSES:
+                    continue
                 x1, y1, x2, y2 = r.boxes.xyxy[i].cpu().numpy().astype(int)
                 cx = int((x1 + x2) / 2)
                 cy = int((y1 + y2) / 2)

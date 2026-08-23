@@ -41,6 +41,8 @@ except ImportError:
 
 app = FastAPI(title="DetectDump")
 
+IRRELEVANT_CLASSES = {"airplane", "train", "kite"}
+
 BASE_DIR = Path(__file__).resolve().parent
 UI_DIR = BASE_DIR / "ui"
 UPLOAD_DIR = Path(tempfile.gettempdir()) / "detectdump_uploads"
@@ -231,6 +233,8 @@ def _run_pipeline(analysis_id: str, video_path: str):
                     cls = int(r.boxes.cls[i])
                     conf = float(r.boxes.conf[i])
                     name = r.names[cls]
+                    if name in IRRELEVANT_CLASSES:
+                        continue
                     x1, y1, x2, y2 = r.boxes.xyxy[i].cpu().numpy().astype(int)
                     cx, cy = (x1 + x2) // 2, (y1 + y2) // 2
                     detections.append({
