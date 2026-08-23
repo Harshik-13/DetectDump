@@ -32,10 +32,10 @@ def run_dumping_detection(video_path: str, output_path: str = "output_dumping.mp
     # Use sensible defaults if no thresholds provided
     if thresholds is None:
         thresholds = Thresholds(
-            movement_threshold=30.0,
-            persistence_frames=60,     # ~2.5s at 24fps
+            movement_threshold=50.0,
+            persistence_frames=30,     # ~1.25s at 24fps
             actor_absence_frames=15,   # ~0.6s at 24fps
-            association_radius=200.0,
+            association_radius=400.0,
             min_track_length=5,
             video_fps=fps,
         )
@@ -70,7 +70,7 @@ def run_dumping_detection(video_path: str, output_path: str = "output_dumping.mp
             break
 
         frame_num += 1
-        results = model.track(frame, persist=True, conf=0.01,
+        results = model.track(frame, persist=True, conf=0.25,
                               tracker="bytetrack_ultralow.yaml", verbose=False)
         r = results[0]
 

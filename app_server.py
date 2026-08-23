@@ -26,8 +26,8 @@ from pathlib import Path
 from typing import Optional
 
 import uvicorn
-from fastapi import FastAPI, File, HTTPException, UploadFile
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from fastapi import FastAPI, File, HTTPException, UploadFile, Request
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from temporal_engine import DumpingEvent, State, TemporalEventEngine, Thresholds
@@ -170,10 +170,10 @@ def _run_pipeline(analysis_id: str, video_path: str):
             }
 
         engine = TemporalEventEngine(Thresholds(
-            movement_threshold=30.0,
-            persistence_frames=60,
+            movement_threshold=50.0,
+            persistence_frames=30,
             actor_absence_frames=15,
-            association_radius=200.0,
+            association_radius=400.0,
             min_track_length=5,
             video_fps=fps,
         ))
@@ -220,7 +220,7 @@ def _run_pipeline(analysis_id: str, video_path: str):
                 analyses[analysis_id]["percentage"] = pct
                 analyses[analysis_id]["stage"] = stage
 
-            results = model.track(frame, persist=True, conf=0.01,
+            results = model.track(frame, persist=True, conf=0.25,
                                   tracker="bytetrack_ultralow.yaml", verbose=False)
             r = results[0]
 
@@ -375,14 +375,14 @@ def _run_pipeline(analysis_id: str, video_path: str):
         h264_path = output_path.replace(".mp4", "_h264.mp4")
         try:
             import subprocess
-            subprocess.run(
+            result = subprocess.run(
                 ["ffmpeg", "-y", "-i", output_path, "-c:v", "libx264", "-preset", "fast",
                  "-crf", "23", "-pix_fmt", "yuv420p", h264_path],
                 check=True, capture_output=True, timeout=120,
             )
             output_path = h264_path
-        except Exception:
-            pass
+        except Exception as ex:
+            print(f"  [{analysis_id}] ffmpeg re-encode failed: {ex}")
 
         elapsed = time.time() - start_time
         avg_fps = frame_num / elapsed if elapsed > 0 else 0
@@ -500,14 +500,43 @@ async def get_evidence_frame(analysis_id: str, track_id: str, idx: int):
 # ---------------------------------------------------------------------------
 
 @app.get("/api/video/{analysis_id}")
-async def get_annotated_video(analysis_id: str):
+async def get_annotated_video(analysis_id: str, request: Request):
     with lock:
         a = analyses.get(analysis_id)
     if not a:
         raise HTTPException(404, "Analysis not found")
     if not a.get("output_path") or not os.path.exists(a["output_path"]):
         raise HTTPException(404, "Video not yet ready")
-    return FileResponse(a["output_path"], media_type="video/mp4")
+    path = a["output_path"]
+    file_size = os.path.getsize(path)
+    range_header = request.headers.get("range")
+    if range_header:
+        start, end = range_header.replace("bytes=", "").split("-")
+        start = int(start)
+        end = int(end) if end else file_size - 1
+        end = min(end, file_size - 1)
+        content_length = end - start + 1
+        def iter_file():
+            with open(path, "rb") as f:
+                f.seek(start)
+                remaining = content_length
+                while remaining > 0:
+                    chunk = f.read(min(8192, remaining))
+                    if not chunk:
+                        break
+                    remaining -= len(chunk)
+                    yield chunk
+        return StreamingResponse(
+            iter_file(),
+            status_code=206,
+            media_type="video/mp4",
+            headers={
+                "Content-Range": f"bytes {start}-{end}/{file_size}",
+                "Accept-Ranges": "bytes",
+                "Content-Length": str(content_length),
+            },
+        )
+    return FileResponse(path, media_type="video/mp4", headers={"Accept-Ranges": "bytes"})
 
 
 # ---------------------------------------------------------------------------

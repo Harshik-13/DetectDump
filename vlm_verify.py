@@ -102,8 +102,8 @@ def verify_dumping_event(
     confidence: float = 0.0,
     api_key: Optional[str] = None,
     base_url: Optional[str] = None,
-    model: str = "openai/gpt-4o-mini",
-    timeout: int = 15,
+    model: str = "gemini-2.5-flash",
+    timeout: int = 30,
 ) -> VerificationResult:
     """
     Send an evidence frame to a VLM for dumping event verification.
@@ -161,7 +161,7 @@ def verify_dumping_event(
                 {"role": "system", "content": "You are a surveillance video analyst. Respond only with valid JSON."},
                 {"role": "user", "content": user_content},
             ],
-            max_tokens=200,
+            max_tokens=1000,
             temperature=0.1,
         )
 

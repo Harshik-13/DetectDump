@@ -51,6 +51,7 @@ class TrackedObject:
     actor_left_frame: int = 0
     candidate_frame: int = 0
     total_frames_tracked: int = 0
+    frames_missing: int = 0
 
 
 @dataclass
@@ -119,6 +120,7 @@ class TemporalEventEngine:
 
             obj = self.objects[tid]
             obj.total_frames_tracked += 1
+            obj.frames_missing = 0
             obj.centroid_history.append(centroid)
             obj.last_centroid = centroid
             obj.last_bbox = det.get("bbox")
@@ -138,15 +140,22 @@ class TemporalEventEngine:
             if event:
                 new_events.append(event)
 
-        # Handle objects that disappeared (re-assess)
+        # Handle objects that disappeared — don't reset immediately;
+        # allow brief YOLO detection gaps. Only reset after prolonged absence.
         for tid in list(self.objects.keys()):
             if tid not in active_object_ids:
                 obj = self.objects[tid]
                 if obj.state in (State.OBSERVING, State.SUSPICIOUS):
-                    # Object disappeared before becoming stationary — reset
-                    obj.state = State.IDLE
-                    obj.frames_stationary = 0
-                    obj.frames_since_actor = 0
+                    obj.frames_missing += 1
+                    if obj.frames_missing > self.thresholds.actor_absence_frames * 2:
+                        obj.state = State.IDLE
+                        obj.frames_stationary = 0
+                        obj.frames_since_actor = 0
+                        obj.frames_missing = 0
+                elif obj.state == State.ACTOR_LEFT:
+                    pass  # don't reset — waiting for persistence or movement
+                elif obj.state == State.DUMPING_CANDIDATE:
+                    pass  # keep candidate even if temporarily unseen
 
         return new_events
 

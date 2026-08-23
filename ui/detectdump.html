@@ -554,7 +554,7 @@ body{
         <div class="canvas-title">Review detection</div>
 
         <div class="video-frame-lg" id="videoFrame">
-          <video id="annotatedVideo" style="width:100%;height:100%;display:none;" controls></video>
+          <video id="annotatedVideo" style="width:100%;height:100%;position:absolute;top:0;left:0;visibility:hidden;" controls preload="auto"></video>
           <div id="videoPlaceholder">
             <svg viewBox="0 0 320 180" preserveAspectRatio="xMidYMid slice">
               <rect width="320" height="180" fill="#0C1516"/>
@@ -872,8 +872,21 @@ body{
 
   playBtn.addEventListener('click', () => {
     videoPlaceholder.style.display = 'none';
-    annotatedVideo.style.display = 'block';
-    annotatedVideo.play();
+    annotatedVideo.style.visibility = 'visible';
+    if (annotatedVideo.readyState >= 2) {
+      annotatedVideo.play().catch(() => {});
+    } else {
+      annotatedVideo.load();
+      annotatedVideo.addEventListener('canplay', function onCanPlay() {
+        annotatedVideo.removeEventListener('canplay', onCanPlay);
+        annotatedVideo.play().catch(() => {});
+      });
+    }
+  });
+  annotatedVideo.addEventListener('error', (e) => {
+    console.error('Video error', e);
+    annotatedVideo.style.visibility = 'hidden';
+    videoPlaceholder.style.display = 'block';
   });
 
   function renderReview(){
@@ -881,7 +894,7 @@ body{
       mainAlertBanner.style.display = 'none';
       document.getElementById('detailList').style.display = 'none';
       summaryBox.innerHTML = '<b>No dumping events detected.</b><br>All objects tracked within normal parameters.';
-      annotatedVideo.style.display = 'none';
+      annotatedVideo.style.visibility = 'hidden';
       videoPlaceholder.style.display = 'block';
       return;
     }
@@ -936,7 +949,7 @@ body{
 
     if(analysisId && !sampleMode){
       annotatedVideo.src = API + '/api/video/' + analysisId;
-      annotatedVideo.style.display = 'none';
+      annotatedVideo.style.visibility = 'hidden';
       videoPlaceholder.style.display = 'block';
     }
   }
@@ -1013,7 +1026,7 @@ body{
     analyzeBtn.disabled = true;
     fileInput.value = "";
 
-    annotatedVideo.style.display = 'none';
+    annotatedVideo.style.visibility = 'hidden';
     annotatedVideo.src = '';
     videoPlaceholder.style.display = 'block';
 
