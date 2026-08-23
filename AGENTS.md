@@ -159,7 +159,7 @@ Verified > Assumed
 ## CURRENT PROJECT STATUS
 
 **Repository**: https://github.com/Harshik-13/DetectDump.git
-**Latest tag**: `v2.0-fastapi-ui`
+**Latest tag**: `v2.1-stable-mvp`
 **Branch**: `main`
 
 ### Architecture
@@ -169,7 +169,9 @@ Frontend (ui/detectdump.html)
     ↓ fetch API
 Backend (app_server.py — FastAPI)
     ↓ threading
-CV Pipeline (YOLOv8n + ByteTrack + Temporal Engine + VLM)
+CV Pipeline (dual-path):
+  Path 1: YOLOv8n + ByteTrack → Temporal Engine → VLM → DumpingEvent
+  Path 2: BackgroundSubtractor → Candidate Discovery → VLM → DumpingEvent
     ↓
 Results → JSON → Frontend renders
 ```
@@ -188,8 +190,9 @@ Results → JSON → Frontend renders
 |------|------|
 | `app_server.py` | FastAPI backend — serves UI + REST API for analysis |
 | `ui/detectdump.html` | Production UI — 4-stage flow connected to backend |
-| `dumping_detector.py` | Standalone CLI pipeline |
+| `dumping_detector.py` | Standalone CLI pipeline (dual-path) |
 | `temporal_engine.py` | Core state machine (IDLE→OBSERVING→SUSPICIOUS→ACTOR_LEFT→DUMPING_CANDIDATE) |
+| `action_candidate_detector.py` | Complementary CV path — background subtraction + person proximity → candidate regions |
 | `vlm_verify.py` | VLM verification via OpenRouter (GPT-4o-mini) |
 | `app.py` | Legacy Streamlit UI (preserved, not primary) |
 
@@ -208,3 +211,4 @@ Results → JSON → Frontend renders
 | `v1.0-code-freeze` | Critical fix pass |
 | `v1.1-generalized` | Generalized detection (behavioral, not waste-class-specific) |
 | `v2.0-fastapi-ui` | FastAPI backend + reference UI frontend |
+| `v2.1-stable-mvp` | Stable MVP — dual-path detection with complementary candidate discovery |

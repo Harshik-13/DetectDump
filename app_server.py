@@ -31,6 +31,7 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from temporal_engine import DumpingEvent, State, TemporalEventEngine, Thresholds
+from action_candidate_detector import ActionCandidateDetector, CandidateConfig
 from vlm_verify import verify_dumping_event
 
 try:
@@ -177,6 +178,11 @@ def _run_pipeline(analysis_id: str, video_path: str):
             video_fps=fps,
         ))
 
+        candidate_config = CandidateConfig(
+            persist_frames=max(20, int(fps * 1.5)),
+            actor_absence_frames=max(10, 15),
+        )
+        candidate_detector = ActionCandidateDetector(candidate_config, frame_size=(width, height))
         model = YOLO("yolov8n.pt")
 
         output_path = str(OUTPUT_DIR / f"{analysis_id}_annotated.mp4")
@@ -237,6 +243,11 @@ def _run_pipeline(analysis_id: str, video_path: str):
 
             new_events = engine.update(detections, frame_num)
 
+            # Complementary path: candidate discovery via background subtraction
+            person_tracks = [d for d in detections if d["class_name"] == "person"]
+            yolo_track_ids = {d["track_id"] for d in detections}
+            new_candidates = candidate_detector.update(frame, person_tracks, yolo_track_ids)
+
             # Annotate frame
             annotated = frame.copy()
             for det in detections:
@@ -276,6 +287,25 @@ def _run_pipeline(analysis_id: str, video_path: str):
                     cv2.putText(annotated, "!! UNATTENDED OBJECT !!", (cx - 100, cy - 50),
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
 
+            # Annotate candidate regions from complementary path
+            for bid, blob in candidate_detector.blobs.items():
+                bx1, by1, bx2, by2 = blob.bbox
+                if blob.emitted:
+                    color = (255, 0, 255)
+                    label = f"CANDIDATE #{blob.id}"
+                elif blob.person_was_nearby and blob.frames_since_person > 0:
+                    color = (255, 165, 0)
+                    label = f"PERSISTING #{blob.id}"
+                elif blob.person_was_nearby:
+                    color = (255, 255, 0)
+                    label = f"PROXIMITY #{blob.id}"
+                else:
+                    color = (128, 128, 128)
+                    label = f"BG #{blob.id}"
+                cv2.rectangle(annotated, (bx1, by1), (bx2, by2), color, 1)
+                cv2.putText(annotated, label, (bx1, by1 - 4),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.35, color, 1)
+
             writer.write(annotated)
 
             for event in new_events:
@@ -299,6 +329,37 @@ def _run_pipeline(analysis_id: str, video_path: str):
                 ev_path = ev_dir / f"{event.track_id}_{idx}.jpg"
                 cv2.imwrite(str(ev_path), annotated)
                 evidence_idx[event.track_id] = idx + 1
+
+            # Complementary path: VLM verification for emitted candidates
+            for cand in new_candidates:
+                vlm_result = verify_dumping_event(
+                    frame=frame,
+                    track_id=cand.id,
+                    class_name="candidate_region",
+                    centroid=cand.centroid,
+                    bbox=cand.bbox,
+                )
+                cand._vlm_result = vlm_result
+                # Track confirmed candidates as events
+                if vlm_result.verified and vlm_result.confirmed:
+                    candidate_event = DumpingEvent(
+                        track_id=cand.id,
+                        class_name="candidate_region",
+                        frame_num=cand.first_frame,
+                        timestamp=cand.first_frame / fps,
+                        stationary_duration_frames=cand.frames_active,
+                        actor_status="LEFT",
+                        centroid=cand.centroid,
+                        bbox=cand.bbox,
+                        vlm=vlm_result,
+                    )
+                    events.append(candidate_event)
+                    evidence_frames[cand.id] = annotated.copy()
+                    ev_dir = Path(analyses[analysis_id]["evidence_dir"])
+                    idx = evidence_idx.get(cand.id, 0)
+                    ev_path = ev_dir / f"candidate_{cand.id}_{idx}.jpg"
+                    cv2.imwrite(str(ev_path), annotated)
+                    evidence_idx[cand.id] = idx + 1
 
             # Log progress every 30 frames
             if frame_num % 30 == 0:
