@@ -890,12 +890,24 @@ body{
   });
 
   function renderReview(){
+    // Always set the video source so the video is playable
+    if(analysisId && !sampleMode){
+      annotatedVideo.src = API + '/api/video/' + analysisId;
+      annotatedVideo.style.visibility = 'hidden';
+      videoPlaceholder.style.display = 'block';
+    }
+
     if(events.length === 0){
       mainAlertBanner.style.display = 'none';
       document.getElementById('detailList').style.display = 'none';
       summaryBox.innerHTML = '<b>No dumping events detected.</b><br>All objects tracked within normal parameters.';
-      annotatedVideo.style.visibility = 'hidden';
-      videoPlaceholder.style.display = 'block';
+      scrubStart.textContent = '0:00';
+      scrubEvent.textContent = '—';
+      const totFrames = videoInfo ? videoInfo.total_frames : 0;
+      const fps = videoInfo ? videoInfo.fps : 30;
+      const totalSec = totFrames / fps;
+      scrubEnd.textContent = Math.floor(totalSec/60) + ':' + String(Math.floor(totalSec%60)).padStart(2,'0');
+      scrubFill.style.width = '100%';
       return;
     }
 
@@ -946,12 +958,6 @@ body{
     scrubEvent.textContent = tsMin + ':' + String(tsSec).padStart(2,'0') + ' flagged';
     const totalSec = totFrames / fps;
     scrubEnd.textContent = Math.floor(totalSec/60) + ':' + String(Math.floor(totalSec%60)).padStart(2,'0');
-
-    if(analysisId && !sampleMode){
-      annotatedVideo.src = API + '/api/video/' + analysisId;
-      annotatedVideo.style.visibility = 'hidden';
-      videoPlaceholder.style.display = 'block';
-    }
   }
 
   document.getElementById('viewEvidenceBtn').addEventListener('click', () => { goTo(4); renderEvidence(); });
