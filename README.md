@@ -1,13 +1,6 @@
 # DetectDump
 
-A defensive, educational Python project that detects suspicious process-dumping
-activity in an authorized local lab environment. It is intended for endpoint
-security learning, alerting concepts, and basic incident-response practice.
-
-## Scope and ethics
-
-This project does not perform credential theft or dump sensitive processes.
-Use it only on systems you own or where you have explicit authorization.
+Illegal Dumping Event Detector — CV pipeline that detects when an actor abandons an object by analyzing temporal persistence after departure.
 
 ## How It Works
 
